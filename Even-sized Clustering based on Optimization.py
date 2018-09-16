@@ -4,7 +4,7 @@ import math
 import matplotlib.pyplot as plt
 
 """program step:
-   1. init membership U and centroids randomly
+   1. init membership U or centroids randomly
    2. update U by simplex method and calculate J
    3. update centroids with U
    4. k-means main process
@@ -35,7 +35,7 @@ def initial_U(dataSet, c):
                membershipSum += U[j, i]
            U[j, -1] = 1 - U[j, 0]
        count = count+1
-    print('initial U', U.shape)
+    #print('initial U', U.shape)
     return U
 
 #initialize centroids randomly
@@ -49,102 +49,123 @@ def initCentroids(dataSet, c):
             maxD = max(dataSet[:, j])
             rangD = float(maxD - minD)
         for i in range(c):
-            centroids[i, :] = minD + rangD * np.random.rand(c-1, 2)
+            centroids[i, :] = minD + rangD * np.random.rand(1, m)
         count = count+1
-    print('initial_centroids:', minD, maxD)
+
     return centroids
 
 
-#centroids with U
+#compute centroids with U
 def calCentroids(dataSet, U, c):
     n, m= dataSet.shape
     centroids = np.mat(np.zeros((c, m)))
-
     for i in range(c):
         memberSum = np.sum(U[:, i])
-
         sampleSum = np.array(np.zeros((1, m)))
         for j in range(n):
-            sampleSum += np.multiply(dataSet[j], U[j,0])
-
-        centroids[i, :] = sampleSum / memberSum
-    #print(memberSum)
-    print('sample', sampleSum)
+            sampleSum += U[j, i]*dataSet[j]
+        centroids[i] = sampleSum / memberSum
+        print(memberSum)
+        print('sample', sampleSum)
     #print('centroids:\n', centroids)
     return centroids
 
+#update U by simplex method
 def upUwithSimplex(dataSet, centroids, c, k):
     n, m = dataSet.shape
-    #U = np.zeros((n, c))
-    J = LpProblem('cal_J', LpMinimize)
-    distance1 = []
-    W = []
+    d = {}
+    U = []
 
     for j in range(n):
         for i in range(c):
-            dist = np.sum(euclDistance(dataSet[j,:], centroids[i,:]))
-            distance1.append(dist)
-    distanceMat = np.reshape(distance1, (n, m))
-    print('distance', distanceMat)
-    V = {(j, i): LpVariable('V{}_{}'.format(j, i), 0, 1,LpInteger) for j in range(n) for i in range(c)}
-    for i in range(c):
-        for j in range(n):
-            J += lpSum(distanceMat[j, i] * V[j, i])
+            d[j,i] = euclDistance(dataSet[j], centroids[i])
+    print('distance', d)
+
+    J = LpProblem('cal_J', LpMinimize)
+    #varibale
+    u = {}
+    for j in range(n):
+        for i in range(c):
+            u[j, i] = LpVariable('U_{:}_{:}'.format(j, i), 0, 1,LpInteger)
+
+    #objective function
+    J += lpSum(u[j, i] * d[j, i] for j in range(n) for i in range(c))
 
     #add constraints
     for j in range(n):
-        J += sum(V[j, i] for i in range(c)) == 1
+        J += lpSum(u[j, i] for i in range(c)) == 1
     for i in range(c):
-        J += sum(V[j, i] for j in range(n)) >= k
-        J += sum(V[j, i] for j in range(n)) <= k + 1
+        J += lpSum(u[j, i] for j in range(n)) >= k
+        J += lpSum(u[j, i] for j in range(n)) <= k + 1
     J.writeLP('cal_J.lp')
     J.solve()
-    print('Status:', LpStatus[J.status])
-    #print('Objective Function:', J)
-    for v in J.variables():
-        W.append(v.varValue)
-        print(v.name, v.varValue)
-    U = np.reshape(W, (n, m))
-    #print('U:', U)
+    print('Status:', LpStatus[J.solve()])
+
+    for j in range(n):
+        for i in range(c):
+            print(u[j, i].name)
+            print(u[j, i].value())
+            U.append(u[j, i].value())
+    print('U:\n', U)
+
+    U = np.reshape(U, (n, c))
+    print('U_mat:\n', U)
+
     return J, U
 
 
 def ECBO(dataSet, c):
     n, m = dataSet.shape
 
-    #1. init membership U and centroids
+    #1. init membership  and centroids
     #initail_U = initial_U(dataSet, c)
     initial_centroids = initCentroids(dataSet, c)
     print('initial centroids:\n', initial_centroids)
 
     #2. update membership U
-    J, U = upUwithSimplex(dataSet, initial_centroids, c, k)
+    lastJ, lastU = upUwithSimplex(dataSet, initial_centroids, c, k)
+    last_centroids = calCentroids(dataSet, lastU, c)
 
     #3. update centroids
+    J, U = upUwithSimplex(dataSet, last_centroids, c, k)
     centroids = calCentroids(dataSet, U, c)
-    print('U:\n', 'centroids:\n', 'J:\n', U, centroids, J)
+
+    #while last_centroids.all() != centroids.all():
+    lastcentroids = centroids
+    J, U = upUwithSimplex(dataSet, lastcentroids, c, k)
+    centroids = calCentroids(dataSet, U, c)
+    print('final U:\n', np.mat(U))
+    print('final centroids:\n', centroids)
+    print('objective function:', value(J.objective))
+
+    for i in range(c):
+        print(np.sum(U[:, i]))
     return U, centroids, J
 
 #show cluster
 def showCluster(dataSet, c, centroids, U):
     n, m = dataSet.shape
 
-    #polt all samples
-    mark = ['or', 'ob', 'og', 'ok', '^r', '+r', 'sr', 'dr', '<r', 'pr']
-    for i in range(n):
-        markIndex = int(U[i, 0])
-        plt.plot(dataSet[i, 0], dataSet[i, 1], mark[markIndex], alpha = 0.6, )
-    mark = ['Dr', 'Db', 'Dg', 'Dk', '^b', '+b', 'sb', 'db', '<b', 'pb']
-
-    #plot centroids
+    # plot centroids
     for j in range(c):
-        plt.plot(centroids[j, :], centroids[j, 1], mark[j])
+        center = plt.scatter(centroids[j, 0], centroids[j, 1], c='k', marker='D')
+
+    #polt all samples
+    mark = ['o', 'o', 'o', 'o', '^', '+', 's', 'd', '<', 'p']
+    color = ['r', 'b', 'g', 'm', 'c', 'y']
+    for i in range(n):
+            markIndex = int(U[i, 0])
+            showData = plt.scatter(dataSet[i, 0], dataSet[i, 1], marker=mark[markIndex], c=color[markIndex], alpha = 0.6)
+            #shape = np.sum(U[:, i])
+            #plt.legend((showData, center), ('cluster(%s)'%shape, 'centroids'), loc=4)
 
     plt.show()
 
 if __name__ == '__main__':
     dataSet = loadData('D:/Tsukuba/My Research/Program/dataset/3_circles_with_diffR/circles_with_diffR.csv')
-    c = 2
+    c = 2  #cluster number
     k = math.floor(len(dataSet) / c)
-    U, centroids, J = ECBO(dataSet, c)#c=2
+    U, centroids, J = ECBO(dataSet, c)
     showCluster(dataSet, c, centroids, U)
+
+
