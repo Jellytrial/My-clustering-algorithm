@@ -116,6 +116,7 @@ def upUwithSimplex(dataSet, centroids, c, k):
 
 def ECBO(dataSet, c):
     n, m = dataSet.shape
+    clusterAssment = np.mat(np.zeros((n, m)))
 
     #1. init membership  and centroids
     #initail_U = initial_U(dataSet, c)
@@ -123,17 +124,28 @@ def ECBO(dataSet, c):
     print('initial centroids:\n', initial_centroids)
 
     #2. update membership U
-    lastJ, lastU = upUwithSimplex(dataSet, initial_centroids, c, k)
+    lastJ, lastU = upUwithSimplex(dataSet, initial_centroids, c, A1, A2)
     last_centroids = calCentroids(dataSet, lastU, c)
 
     #3. update centroids
-    J, U = upUwithSimplex(dataSet, last_centroids, c, k)
+    J, U = upUwithSimplex(dataSet, last_centroids, c, A1, A2)
     centroids = calCentroids(dataSet, U, c)
 
     #while last_centroids.all() != centroids.all():
     lastcentroids = centroids
-    J, U = upUwithSimplex(dataSet, lastcentroids, c, k)
+    J, U = upUwithSimplex(dataSet, lastcentroids, c, A1, A2)
     centroids = calCentroids(dataSet, U, c)
+
+    for i in range(n):
+        minDist = 10000.0
+        minIdex = 0
+        for j in range(c):
+            distance = euclDistance(dataSet[i], centroids[j])
+            if distance < minDist:
+                minDist = distance
+                minIdex = j
+        if clusterAssment[i, 0] != minIdex:
+            clusterAssment[i, :] = minIdex
     print('final U:\n', np.mat(U))
     print('final centroids:\n', centroids)
     print('objective function:', value(J.objective))
@@ -143,29 +155,29 @@ def ECBO(dataSet, c):
     return U, centroids, J
 
 #show cluster
-def showCluster(dataSet, c, centroids, U):
+def showCluster(dataSet, c, centroids, clusterAssment):
     n, m = dataSet.shape
 
     # plot centroids
     for j in range(c):
-        center = plt.scatter(centroids[j, 0], centroids[j, 1], c='k', marker='D')
+        plt.scatter(centroids[j, 0], centroids[j, 1], c='k', marker='D')
 
     #polt all samples
     mark = ['o', 'o', 'o', 'o', '^', '+', 's', 'd', '<', 'p']
     color = ['r', 'b', 'g', 'm', 'c', 'y']
     for i in range(n):
-            markIndex = int(U[i, 0])
-            showData = plt.scatter(dataSet[i, 0], dataSet[i, 1], marker=mark[markIndex], c=color[markIndex], alpha = 0.6)
+        markIndex = int(clusterAssment[i, 0])
+        plt.scatter(dataSet[i, 0], dataSet[i, 1], marker=mark[markIndex], c=color[markIndex], alpha = 0.6)
             #shape = np.sum(U[:, i])
             #plt.legend((showData, center), ('cluster(%s)'%shape, 'centroids'), loc=4)
 
     plt.show()
 
 if __name__ == '__main__':
-    dataSet = loadData('D:/Tsukuba/My Research/Program/dataset/3_circles_with_diffR/circles_with_diffR.csv')
-    c = 2  #cluster number
+    dataSet = loadData('D:/Tsukuba/My Research/Program/dataset/1_normal_data/normal_data.csv')
+    c = 4  #cluster number
     k = math.floor(len(dataSet) / c)
-    U, centroids, J = ECBO(dataSet, c)
+    U, centroids, J, clusterAssment = ECBO(dataSet, c)
     showCluster(dataSet, c, centroids, U)
 
 
