@@ -184,7 +184,7 @@ if __name__ == '__main__':
     A1 = k - alpha
     A2 = k + alpha
     U, centroids, J, clusterAssment = ECBO(dataSet, c)
-    showCluster(dataSet, c, centroids, U)
+    showCluster(dataSet, c, centroids, clusterAssment)
 
 
 
