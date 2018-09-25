@@ -178,6 +178,6 @@ if __name__ == '__main__':
     c = 4  #cluster number
     k = math.floor(len(dataSet) / c)
     U, centroids, J, clusterAssment = ECBO(dataSet, c)
-    showCluster(dataSet, c, centroids, U)
+    showCluster(dataSet, c, centroids, clusterAssment)
 
 
